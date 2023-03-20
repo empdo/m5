@@ -7,6 +7,10 @@ use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use std::time::Duration;
 
+fn distance(pos1: (f32, f32), pos2: (f32, f32)) -> f32 {
+    return ((pos2.0 - pos1.0).powi(2) + (pos2.1 - pos1.1).powi(2)).sqrt()
+}
+
 fn get_eq(pos1: (f32, f32), pos2: (f32, f32)) -> (f32, f32) {
     let mut k = 0.0;
     let mut c = 0.0;
@@ -27,8 +31,17 @@ fn get_eq(pos1: (f32, f32), pos2: (f32, f32)) -> (f32, f32) {
     return (k, c);
 }
 
-fn draw_line(pos1: (f32, f32), pos2: (f32, f32), canvas: &mut WindowCanvas) {
-    let line = get_eq(pos1, pos2);
+fn draw_line(pos1: (f32, f32), pos2: (f32, f32), canvas: &mut WindowCanvas) -> (f32, f32) {
+    let mut p1 = pos1;
+    let _p1 = pos1;
+    let mut p2 = pos2;
+
+    if (p1.0 > p2.0 || p1.0 < p1.1) {
+        p1 = pos2;
+        p2 = _p1;
+    }
+
+    let line = get_eq(p1, p2);
 
     let k = line.0;
     let c = line.1;
@@ -36,25 +49,20 @@ fn draw_line(pos1: (f32, f32), pos2: (f32, f32), canvas: &mut WindowCanvas) {
     let offset = 50.0;
 
     if k == 0.0 {
-        if pos2.0 == pos1.0 {
-            let mut y = pos1.1;
-            while y < (pos2.1) {
+        if p2.0 == p1.0 {
+            let mut y = p1.1;
+            while y < (p2.1) {
                 canvas.set_draw_color(Color::RGB(255, 255, 255));
-                canvas.fill_rect(Rect::new(
-                    (pos1.0 + offset) as i32,
-                    (y + offset) as i32,
-                    3,
-                    3,
-                ));
+                canvas.fill_rect(Rect::new((p1.0 + offset) as i32, (y + offset) as i32, 3, 3));
 
                 y = y + 1.0;
             }
-            return;
+            return line;
         }
     }
 
-    let mut x = pos1.0;
-    while x < pos2.0 {
+    let mut x = p1.0;
+    while x < p2.0 {
         let y = k * x + c + offset;
 
         canvas.set_draw_color(Color::RGB(255, 255, 255));
@@ -62,39 +70,41 @@ fn draw_line(pos1: (f32, f32), pos2: (f32, f32), canvas: &mut WindowCanvas) {
 
         x = x + 1.0;
     }
+
+    return line;
 }
 
-
 fn line_intersection(
-    line1: (f32, f32),
+    line1: (f32, f32), //k, c
     line2: (f32, f32),
-    canvas: &mut WindowCanvas
-    ) {
-
+    canvas: &mut WindowCanvas,
+) -> (f32, f32) {
     //https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
 
-    let x = (line2.1 - line1.1)/(line1.0-line2.0) + 50.0;
-    let y = line1.0*(line2.1 - line1.1)/(line1.0-line2.0) + line1.1 + 50.0;
-
-    println!("{} {}", x, y);
+    let x = (line2.1 - line1.1) / (line1.0 - line2.0) + 50.0;
+    let y = line1.0 * (line2.1 - line1.1) / (line1.0 - line2.0) + line1.1 + 50.0;
 
     canvas.set_draw_color(Color::RGB(100, 100, 100));
     canvas.fill_rect(Rect::new(x as i32, y as i32, 7, 7));
+
+    return (x, y);
 }
 
-pub fn get_points(ratio: f32, heigth: f32) {
-
+pub fn get_points(ratio: f32, heigth: f32) -> Vec<(f32, f32)> {
     let mut points = vec![];
-    //first line
 
-    let mut i = 0;
-    let mut j = 0;
-    while i <= 3 {
-        points.push((0.0, 0.0));
-        points.push(((heigth * ratio), 0.0));
-        points.push(((heigth * (1.0 - ratio), 0.0)));
-    }
-     
+    let p = ratio * heigth;
+    let p2 = (1.0 - ratio) * heigth;
+    points.push((0.0, 0.0));
+    points.push((p, 0.0));
+    points.push((heigth, 0.0));
+    points.push((heigth, p));
+    points.push((heigth, heigth));
+    points.push((p2, heigth));
+    points.push((0.0, heigth));
+    points.push((0.0, p2));
+
+    return points;
 }
 
 pub fn main() {
@@ -116,20 +126,59 @@ pub fn main() {
     let width = 550;
     let heigth = 550;
 
+    let mut frame = 0f32;
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
-        draw_line((0.0, 0.0), (500.0, 0.0), &mut canvas);
-        draw_line((0.0, 0.0), (0.0, 500.0), &mut canvas);
-        draw_line((0.0, 500.0), (500.0, 500.0), &mut canvas);
-        draw_line((500.0, 0.0), (500.0, 500.0), &mut canvas);
+        let ratio = (frame * 0.1 % 100.0) / 100.0;
+        let mut lines: Vec<(f32, f32)> = vec![];
 
-        draw_line((0.0, 100.0), (500.0, 400.0), &mut canvas);
-        draw_line((100.0, 0.0), (500.0, 500.0), &mut canvas);
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.fill_rect(Rect::new(0, 0, width, heigth));
 
-        let line1 = get_eq((0.0, 100.0), (500.0, 400.0));
-        let line2 = get_eq((100.0, 0.0), (500.0, 500.0));
+        let points = get_points(ratio, (heigth - 50) as f32);
+        for (index, point) in points.iter().enumerate() {
+            if points.len() > index + 1 {
+                draw_line(*point, points[index + 1], &mut canvas);
+            }
+        }
+        draw_line(points[points.len() - 1], points[0], &mut canvas);
 
-        line_intersection(line1, line2, &mut canvas);
+        let mut i = 0i32;
+        let length = points.len() as i32;
+        while i < length {
+            let point;
+
+            if i % 2 == 0 {
+                point = points[(i - 4).rem_euclid(length) as usize + 1];
+            } else {
+                point = points[(i + 4).rem_euclid(length) as usize - 1];
+            }
+            let line = draw_line(points[i as usize], point, &mut canvas);
+            lines.push(line);
+
+            i += 1;
+        }
+
+        let mut intersections: Vec<(f32, f32)> = vec![];
+        for line in lines.iter() {
+            for _line in lines.iter() {
+                if line.0 != _line.0 {
+                    let intersect = line_intersection(*line, *_line, &mut canvas);
+                    if !intersections.contains(&intersect) {
+                        intersections.push(intersect);
+                    }
+                }
+            }
+        }
+        //blir för många
+
+        //intersections.sort_by_key(|k| k.1 as i32);
+        println!("{:?}", intersections);
+        intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        println!("{:?}", intersections);
+        if intersections.len() > 1 {
+            println!("{}", distance(intersections[0], intersections[1]).powi(2));
+        }
 
         for event in event_pump.poll_iter() {
             match event {
@@ -142,6 +191,8 @@ pub fn main() {
             }
         }
         // The rest of the game loop goes here...
+        //
+        frame += 1.0;
 
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
