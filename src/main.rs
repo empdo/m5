@@ -6,9 +6,10 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use std::time::Duration;
+use std::vec;
 
 fn distance(pos1: (f32, f32), pos2: (f32, f32)) -> f32 {
-    return ((pos2.0 - pos1.0).powi(2) + (pos2.1 - pos1.1).powi(2)).sqrt()
+    return ((pos2.0 - pos1.0).powi(2) + (pos2.1 - pos1.1).powi(2)).sqrt();
 }
 
 fn get_eq(pos1: (f32, f32), pos2: (f32, f32)) -> (f32, f32) {
@@ -74,6 +75,11 @@ fn draw_line(pos1: (f32, f32), pos2: (f32, f32), canvas: &mut WindowCanvas) -> (
     return line;
 }
 
+fn round(x: f32, decimals: u32) -> f32 {
+    let y = 10i32.pow(decimals) as f32;
+    (x * y).round() / y
+}
+
 fn line_intersection(
     line1: (f32, f32), //k, c
     line2: (f32, f32),
@@ -85,9 +91,9 @@ fn line_intersection(
     let y = line1.0 * (line2.1 - line1.1) / (line1.0 - line2.0) + line1.1 + 50.0;
 
     canvas.set_draw_color(Color::RGB(100, 100, 100));
-    canvas.fill_rect(Rect::new(x as i32, y as i32, 7, 7));
+    canvas.fill_rect(Rect::new((x - 1.5) as i32, (y - 1.5) as i32, 6, 6));
 
-    return (x, y);
+    return (round(x, 1), round(y, 1));
 }
 
 pub fn get_points(ratio: f32, heigth: f32) -> Vec<(f32, f32)> {
@@ -128,6 +134,10 @@ pub fn main() {
 
     let mut frame = 0f32;
     let mut event_pump = sdl_context.event_pump().unwrap();
+    println!("{0: <10} | {1: <10}" , "Area", "Ratio");
+
+    let mut a = vec![];
+    
     'running: loop {
         let ratio = (frame * 0.1 % 100.0) / 100.0;
         let mut lines: Vec<(f32, f32)> = vec![];
@@ -143,15 +153,15 @@ pub fn main() {
         }
         draw_line(points[points.len() - 1], points[0], &mut canvas);
 
-        let mut i = 0i32;
+        let mut i = 1i32;
         let length = points.len() as i32;
         while i < length {
             let point;
 
             if i % 2 == 0 {
-                point = points[(i - 4).rem_euclid(length) as usize + 1];
+                point = points[(i - 3).rem_euclid(length) as usize];
             } else {
-                point = points[(i + 4).rem_euclid(length) as usize - 1];
+                point = points[(i + 3).rem_euclid(length) as usize];
             }
             let line = draw_line(points[i as usize], point, &mut canvas);
             lines.push(line);
@@ -162,7 +172,7 @@ pub fn main() {
         let mut intersections: Vec<(f32, f32)> = vec![];
         for line in lines.iter() {
             for _line in lines.iter() {
-                if line.0 != _line.0 {
+                if round(line.0, 1) != round(_line.0, 1) {
                     let intersect = line_intersection(*line, *_line, &mut canvas);
                     if !intersections.contains(&intersect) {
                         intersections.push(intersect);
@@ -170,14 +180,18 @@ pub fn main() {
                 }
             }
         }
-        //blir för många
 
-        //intersections.sort_by_key(|k| k.1 as i32);
-        println!("{:?}", intersections);
         intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        println!("{:?}", intersections);
-        if intersections.len() > 1 {
-            println!("{}", distance(intersections[0], intersections[1]).powi(2));
+        if intersections.len() > 1 && frame as i32 % 20 == 0{
+            println!(
+                "{0: <15} | {1: <15}",
+                distance(intersections[0], intersections[1]).powi(2) / ((width - 50) * (heigth - 50)) as f32,
+                round(ratio, 3) 
+            );
+
+            a.push((
+                (width * heigth) as f32 / distance(intersections[0], intersections[1]).powi(2),
+                ratio));
         }
 
         for event in event_pump.poll_iter() {
@@ -193,6 +207,11 @@ pub fn main() {
         // The rest of the game loop goes here...
         //
         frame += 1.0;
+
+        if ratio > 0.99 {
+            break 'running
+        }
+
 
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
