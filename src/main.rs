@@ -25,9 +25,9 @@ fn get_eq(pos1: (f32, f32), pos2: (f32, f32)) -> (f32, f32) {
             k = (pos2.1 - pos1.1) / (pos2.0 - pos1.0);
         }
 
-        c += pos1.1;
-        c -= pos1.0 * k;
+        c += pos1.1 - pos1.0 * k;
     }
+
 
     return (k, c);
 }
@@ -139,7 +139,8 @@ pub fn main() {
     let mut a = vec![];
     
     'running: loop {
-        let ratio = (frame * 0.1 % 100.0) / 100.0;
+        let mut ratio = 1.0/4.0; //(frame * 0.1 % 100.0) / 100.0;
+        
         let mut lines: Vec<(f32, f32)> = vec![];
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -153,21 +154,34 @@ pub fn main() {
         }
         draw_line(points[points.len() - 1], points[0], &mut canvas);
 
-        let mut i = 1i32;
         let length = points.len() as i32;
-        while i < length {
-            let point;
-
-            if i % 2 == 0 {
-                point = points[(i - 3).rem_euclid(length) as usize];
-            } else {
-                point = points[(i + 3).rem_euclid(length) as usize];
+        let line = draw_line(points[(2) as usize], points[(length - 1) as usize], &mut canvas);
+        println!("{} {}", line.0, line.1);
+        for (prev, next) in points.iter().zip(1..length) {
+            let point = points[((next + 2) % length) as usize];
+            if prev.0 < point.0 {
+                let line = draw_line(point, *prev, &mut canvas);
+                lines.push(line);
+            }else {
+                let line = draw_line(*prev, point, &mut canvas);
+                lines.push(line);
             }
-            let line = draw_line(points[i as usize], point, &mut canvas);
-            lines.push(line);
-
-            i += 1;
         }
+
+
+       // while i < length {
+       //     let point;
+
+       //     if i % 2 == 0 {
+       //         point = points[(i - 3).rem_euclid(length) as usize];
+       //     } else {
+       //         point = points[(i + 3).rem_euclid(length) as usize];
+       //     }
+       //     let line = draw_line(points[i as usize], point, &mut canvas);
+       //     lines.push(line);
+
+       //     i += 1;
+       // }
 
         let mut intersections: Vec<(f32, f32)> = vec![];
         for line in lines.iter() {
