@@ -5,6 +5,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
+use std::collections::HashMap;
 use std::time::Duration;
 use std::vec;
 
@@ -27,7 +28,6 @@ fn get_eq(pos1: (f32, f32), pos2: (f32, f32)) -> (f32, f32) {
 
         c += pos1.1 - pos1.0 * k;
     }
-
 
     return (k, c);
 }
@@ -90,8 +90,8 @@ fn line_intersection(
     let x = (line2.1 - line1.1) / (line1.0 - line2.0) + 50.0;
     let y = line1.0 * (line2.1 - line1.1) / (line1.0 - line2.0) + line1.1 + 50.0;
 
-    canvas.set_draw_color(Color::RGB(100, 100, 100));
-    canvas.fill_rect(Rect::new((x - 1.5) as i32, (y - 1.5) as i32, 6, 6));
+//    canvas.set_draw_color(Color::RGB(250, 0, 0));
+//    canvas.fill_rect(Rect::new((x - 1.5) as i32, (y - 1.5) as i32, 6, 6));
 
     return (round(x, 1), round(y, 1));
 }
@@ -104,13 +104,28 @@ pub fn get_points(ratio: f32, heigth: f32) -> Vec<(f32, f32)> {
     points.push((0.0, 0.0));
     points.push((p, 0.0));
     points.push((heigth, 0.0));
-    points.push((heigth, p));
+    //points.push((heigth, p));
+    points.push((heigth, heigth / 2.0));
     points.push((heigth, heigth));
+    //points.push((p2, heigth));
     points.push((p2, heigth));
     points.push((0.0, heigth));
-    points.push((0.0, p2));
+    points.push((0.0, heigth / 2.0));
 
     return points;
+}
+
+fn octagon_area(points: &Vec<(f32, f32)>) -> f32 {
+    // Check that we have exactly 8 points
+    assert_eq!(points.len(), 8);
+
+    // Calculate the area of the octagon
+    let area = 0.5 * points.iter().enumerate().fold(0.0, |acc, (i, p)| {
+        let j = (i + 1) % 8;
+        acc + (points[j].0 + p.0) * (points[j].1 - p.1)
+    });
+
+    area.abs()
 }
 
 pub fn main() {
@@ -134,13 +149,13 @@ pub fn main() {
 
     let mut frame = 0f32;
     let mut event_pump = sdl_context.event_pump().unwrap();
-    println!("{0: <10} | {1: <10}" , "Area", "Ratio");
+    println!("{0: <10} | {1: <10}", "Area", "Ratio");
 
-    let mut a = vec![];
-    
+    //    let mut a = vec![];
+
     'running: loop {
-        let mut ratio = 1.0/4.0; //(frame * 0.1 % 100.0) / 100.0;
-        
+        let ratio = 0.4 + (frame * 0.1 % 20.0) / 100.0;
+
         let mut lines: Vec<(f32, f32)> = vec![];
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -155,58 +170,81 @@ pub fn main() {
         draw_line(points[points.len() - 1], points[0], &mut canvas);
 
         let length = points.len() as i32;
-        let line = draw_line(points[(2) as usize], points[(length - 1) as usize], &mut canvas);
-        println!("{} {}", line.0, line.1);
+        let line = draw_line(
+            points[(2) as usize],
+            points[(length - 1) as usize],
+            &mut canvas,
+        );
+        lines.push(line);
         for (prev, next) in points.iter().zip(1..length) {
             let point = points[((next + 2) % length) as usize];
             if prev.0 < point.0 {
                 let line = draw_line(point, *prev, &mut canvas);
                 lines.push(line);
-            }else {
+            } else {
                 let line = draw_line(*prev, point, &mut canvas);
                 lines.push(line);
             }
         }
 
+        // while i < length {
+        //     let point;
 
-       // while i < length {
-       //     let point;
+        //     if i % 2 == 0 {
+        //         point = points[(i - 3).rem_euclid(length) as usize];
+        //     } else {
+        //         point = points[(i + 3).rem_euclid(length) as usize];
+        //     }
+        //     let line = draw_line(points[i as usize], point, &mut canvas);
+        //     lines.push(line);
 
-       //     if i % 2 == 0 {
-       //         point = points[(i - 3).rem_euclid(length) as usize];
-       //     } else {
-       //         point = points[(i + 3).rem_euclid(length) as usize];
-       //     }
-       //     let line = draw_line(points[i as usize], point, &mut canvas);
-       //     lines.push(line);
-
-       //     i += 1;
-       // }
+        //     i += 1;
+        // }
 
         let mut intersections: Vec<(f32, f32)> = vec![];
         for line in lines.iter() {
-            for _line in lines.iter() {
-                if round(line.0, 1) != round(_line.0, 1) {
-                    let intersect = line_intersection(*line, *_line, &mut canvas);
-                    if !intersections.contains(&intersect) {
-                        intersections.push(intersect);
+            if line.0 != 0.0 {
+                let mut _intersections: Vec<(f32, f32)> = vec![];
+                for _line in lines.iter() {
+                    if round(line.0, 1) != round(_line.0, 1) && line.0 != 0.0 {
+                        let intersect = line_intersection(*line, *_line, &mut canvas);
+                        if !intersections.contains(&intersect) {
+                            _intersections.push(intersect);
+                        }
                     }
                 }
+
+                _intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                _intersections.drain(0..2);
+                _intersections.drain((_intersections.len() - 2 ).._intersections.len());
+
+                for intersection in &_intersections{
+                    canvas.set_draw_color(Color::RGB(250, 0, 0));
+                    canvas.fill_rect(Rect::new((intersection.0 - 1.5) as i32, (intersection.1 - 1.5) as i32, 6, 6));
+                }
+
+                intersections.append(&mut _intersections);
+                
             }
         }
 
-        intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        if intersections.len() > 1 && frame as i32 % 20 == 0{
-            println!(
-                "{0: <15} | {1: <15}",
-                distance(intersections[0], intersections[1]).powi(2) / ((width - 50) * (heigth - 50)) as f32,
-                round(ratio, 3) 
-            );
+        let area = octagon_area(&intersections);
+        println!("{0: <10} ", area / ((width - 50) * (heigth - 50)) as f32);
+        //println!("{0: <10} | {1: <10}", area, width * heigth);
 
-            a.push((
-                (width * heigth) as f32 / distance(intersections[0], intersections[1]).powi(2),
-                ratio));
-        }
+        
+        //  intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        //  if intersections.len() > 1 && frame as i32 % 20 == 0{
+        //     // println!(
+        //     //     "{0: <15} | {1: <15}",
+        //     //     distance(intersections[0], intersections[1]).powi(2) / ((width - 50) * (heigth - 50)) as f32,
+        //     //     round(ratio, 3)
+        //     // );
+
+        //      a.push((
+        //          (width * heigth) as f32 / distance(intersections[0], intersections[1]).powi(2),
+        //          ratio));
+        //  }
 
         for event in event_pump.poll_iter() {
             match event {
@@ -223,11 +261,11 @@ pub fn main() {
         frame += 1.0;
 
         if ratio > 0.99 {
-            break 'running
+            break 'running;
         }
-
 
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 }
+
