@@ -229,7 +229,9 @@ pub fn main() {
         }
 
         let area = octagon_area(&intersections);
-        println!("{0: <10} ", area / ((width - 50) * (heigth - 50)) as f32);
+        if frame % 10.0 == 0.0 {
+            println!("{0: <10 }, {1: <10} ", ratio, area / ((width - 50) * (heigth - 50)) as f32);
+        }
         //println!("{0: <10} | {1: <10}", area, width * heigth);
 
         

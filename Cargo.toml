@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 linreg = "0.2.0"
 sdl2 = "0.35.2"
+
+[[example]]
+name = "main2"
